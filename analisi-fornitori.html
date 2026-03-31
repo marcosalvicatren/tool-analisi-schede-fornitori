@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analisi Mastrini Fornitori</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0ede8;color:#1a1a18;min-height:100vh;font-size:14px;line-height:1.5}
+header{background:#0c2340;color:#fff;padding:16px 32px;display:flex;align-items:center;gap:16px}
+header h1{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px}
+header .badge{margin-left:auto;background:rgba(255,255,255,0.12);padding:3px 10px;border-radius:20px;font-size:11px;opacity:.8}
+main{max-width:1200px;margin:0 auto;padding:28px 20px 60px}
+
+.card{background:#fff;border-radius:12px;border:1px solid #e2ddd6;padding:22px 26px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.card-title{font-size:11px;font-weight:600;color:#7a776e;text-transform:uppercase;letter-spacing:.6px;margin-bottom:16px}
+
+/* SETTINGS */
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.field label{display:block;font-size:12px;color:#7a776e;font-weight:500;margin-bottom:5px}
+.field input{width:100%;padding:8px 11px;border:1px solid #d2cec6;border-radius:7px;font-size:13px;font-family:'Segoe UI',monospace}
+.field input:focus{outline:none;border-color:#185fa5;box-shadow:0 0 0 3px #e6f1fb}
+
+/* LEGEND */
+.legend{display:flex;flex-wrap:wrap;gap:8px;padding-top:14px;border-top:1px solid #ebe8e0;margin-top:14px}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#5a5750}
+
+/* UPLOAD */
+.drop-zone{border:2px dashed #c8c3ba;border-radius:10px;padding:36px 24px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s;position:relative}
+.drop-zone:hover,.drop-zone.over{border-color:#185fa5;background:#eef5fc}
+.drop-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-zone .dz-icon{font-size:32px;margin-bottom:8px}
+.drop-zone .dz-title{font-size:15px;font-weight:500;margin-bottom:4px}
+.drop-zone .dz-sub{font-size:13px;color:#7a776e}
+
+/* PROGRESS */
+.progress-bar{width:100%;height:6px;background:#e2ddd6;border-radius:4px;margin-top:14px;overflow:hidden;display:none}
+.progress-fill{height:100%;background:#185fa5;border-radius:4px;transition:width .3s;width:0%}
+
+/* STATS */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
+.stat-card{background:#fff;border-radius:10px;border:1px solid #e2ddd6;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,0.05);position:relative;overflow:hidden}
+.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.s-red::after{background:#c0392b}
+.stat-card.s-orange::after{background:#c05c1a}
+.stat-card.s-yellow::after{background:#9a7c10}
+.stat-card.s-violet::after{background:#6a3a9a}
+.stat-card.s-fuchsia::after{background:#a0207a}
+.stat-card.s-green::after{background:#1a6b3a}
+.stat-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#9a9690;margin-bottom:6px}
+.stat-value{font-size:2rem;font-weight:300;line-height:1;color:#1a1a18}
+.stat-card.s-red .stat-value{color:#c0392b}
+.stat-card.s-orange .stat-value{color:#c05c1a}
+.stat-card.s-yellow .stat-value{color:#9a7c10}
+.stat-card.s-violet .stat-value{color:#6a3a9a}
+.stat-card.s-fuchsia .stat-value{color:#a0207a}
+.stat-card.s-green .stat-value{color:#1a6b3a}
+
+/* CONTROLS */
+.controls{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.search-wrap{flex:1;min-width:220px;position:relative}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none}
+.search-box{width:100%;background:#fff;border:1px solid #d2cec6;border-radius:8px;padding:8px 11px 8px 34px;font-family:inherit;font-size:13px;color:#1a1a18;box-shadow:0 1px 2px rgba(0,0,0,0.04)}
+.search-box:focus{outline:none;border-color:#185fa5}
+.filter-group{display:flex;gap:2px;background:#ebe8e0;border-radius:8px;padding:3px;border:1px solid #d2cec6}
+.filter-btn{background:transparent;border:none;border-radius:6px;padding:5px 12px;font-family:inherit;font-size:12px;font-weight:500;color:#7a776e;cursor:pointer;transition:all .15s;white-space:nowrap}
+.filter-btn:hover{background:#fff;color:#1a1a18}
+.filter-btn.active{background:#fff;color:#1a1a18;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.filter-btn.active.f-red{color:#c0392b}
+.filter-btn.active.f-orange{color:#c05c1a}
+.filter-btn.active.f-yellow{color:#9a7c10}
+.filter-btn.active.f-violet{color:#6a3a9a}
+.filter-btn.active.f-fuchsia{color:#a0207a}
+.filter-btn.active.f-green{color:#1a6b3a}
+.btn-export{background:#0c2340;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-family:inherit;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .15s}
+.btn-export:hover{background:#163554}
+
+/* TABLE */
+.tbl-container{background:#fff;border-radius:12px;border:1px solid #e2ddd6;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead{background:#0c2340;position:sticky;top:0;z-index:10}
+thead th{color:#fff;padding:10px 12px;text-align:left;font-size:11px;font-weight:500;white-space:nowrap;cursor:pointer;user-select:none;border-right:1px solid rgba(255,255,255,0.08)}
+thead th:last-child{border-right:none}
+thead th:hover{background:#163554}
+thead th.sorted{background:#1a4a7a}
+th .si{margin-left:4px;opacity:.5}
+th.sorted .si{opacity:1}
+tbody tr:nth-child(even) td{background:#faf9f7}
+tbody tr:hover td{background:#f0ede8}
+td{padding:9px 12px;border-bottom:1px solid #ebe8e0;font-size:13px;white-space:nowrap;border-right:1px solid #f5f3f0}
+td:last-child{border-right:none}
+tbody tr:last-child td{border-bottom:none}
+.tbl-footer{padding:10px 14px;border-top:1px solid #ebe8e0;font-size:12px;color:#9a9690;background:#faf9f7}
+
+/* PILLS */
+.pill{display:inline-flex;align-items:center;gap:3px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
+.pill-red{background:#fdf0ee;color:#c0392b;border:1px solid #e8b4ae}
+.pill-orange{background:#fdf3ed;color:#c05c1a;border:1px solid #e8c4a0}
+.pill-yellow{background:#fdf8e8;color:#9a7c10;border:1px solid #e0d090}
+.pill-violet{background:#f4eeff;color:#6a3a9a;border:1px solid #c8a8e8}
+.pill-fuchsia{background:#fceef8;color:#a0207a;border:1px solid #e0a8d0}
+.pill-green{background:#eaf3de;color:#1a6b3a;border:1px solid #a0d4b4}
+.pill-neutral{background:#f0ede8;color:#7a776e;border:1px solid #d2cec6}
+
+/* AMOUNTS */
+.num{font-variant-numeric:tabular-nums}
+.amt-neg{color:#c0392b;font-variant-numeric:tabular-nums}
+.amt-pos{color:#1a6b3a;font-variant-numeric:tabular-nums}
+.amt-muted{color:#7a776e;font-variant-numeric:tabular-nums}
+
+/* CO PILL */
+.co-tag{display:inline-block;font-size:10px;font-family:monospace;background:#f0ede8;color:#7a776e;padding:1px 5px;border-radius:3px;border:1px solid #d2cec6}
+
+/* EXPAND */
+.expand-btn{background:none;border:none;width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#9a9690;font-size:11px;transition:all .15s}
+.expand-btn:hover{background:#f0ede8;color:#1a1a18}
+
+/* DETAIL ROW */
+.detail-row>td{background:#faf8f5!important;padding:0;border-bottom:1px solid #d2cec6}
+.detail-inner{padding:16px 16px 16px 52px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.detail-section-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9a9690;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.anomaly-list{display:flex;flex-direction:column;gap:5px}
+.anomaly-item{font-size:12.5px;padding:7px 10px;border-radius:6px;border-left:3px solid;line-height:1.4}
+.anomaly-item.red{border-color:#c0392b;background:#fdf0ee;color:#8a1a0e}
+.anomaly-item.orange{border-color:#c05c1a;background:#fdf3ed;color:#7a3a08}
+.anomaly-item.yellow{border-color:#9a7c10;background:#fdf8e8;color:#6a5008}
+.anomaly-item.violet{border-color:#6a3a9a;background:#f4eeff;color:#4a1a7a}
+.anomaly-item.fuchsia{border-color:#a0207a;background:#fceef8;color:#780060}
+
+/* MINI TABLE */
+.mini-wrap{border:1px solid #e2ddd6;border-radius:8px;overflow:hidden}
+.mini-wrap table thead{background:#f0ede8;position:static}
+.mini-wrap table thead th{color:#7a776e;font-size:10px;padding:6px 10px;border-right:1px solid #e2ddd6}
+.mini-wrap table tbody td{background:#fff!important;font-size:12px;padding:6px 10px;border-right:1px solid #f5f3f0}
+.mini-wrap table tbody tr:hover td{background:#faf9f7!important}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:60px 20px}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.3}
+.empty-title{font-size:15px;font-weight:500;color:#7a776e}
+
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#f0ede8}
+::-webkit-scrollbar-thumb{background:#c8c3ba;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#a09890}
+
+@media(max-width:900px){main{padding:16px 12px 40px}.detail-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📋 Analisi Mastrini Fornitori</h1>
+  <span class="badge">v1.0</span>
+</header>
+
+<main>
+
+<!-- PARAMETRI -->
+<div class="card">
+  <div class="card-title">Parametri analisi</div>
+  <div class="params">
+    <div class="field">
+      <label>Data di riferimento</label>
+      <input type="text" id="dataRif" value="31/12/2025" placeholder="gg/mm/aaaa">
+    </div>
+    <div class="field">
+      <label>Mesi inattività — VIOLA</label>
+      <input type="number" id="soglia3" value="3" min="1">
+    </div>
+    <div class="field">
+      <label>Mesi inattività — GIALLO</label>
+      <input type="number" id="soglia6" value="6" min="1">
+    </div>
+    <div class="field">
+      <label>Mesi inattività — ARANCIONE</label>
+      <input type="number" id="soglia12" value="12" min="1">
+    </div>
+    <div class="field">
+      <label>Soglia anomalia pagamento (%)</label>
+      <input type="number" id="sogliaPct" value="2" min="1">
+    </div>
+    <div class="field">
+      <label>Codici CO — fattura fornitore</label>
+      <input type="text" id="causFat" value="FA,FP,FD,FN">
+    </div>
+    <div class="field">
+      <label>Codici CO — pagamento</label>
+      <input type="text" id="causPag" value="PA,BP,RI,RB">
+    </div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><span class="pill pill-red">RED</span> Saldo in DARE (anomalia assoluta)</div>
+    <div class="legend-item"><span class="pill pill-orange">ORANGE</span> Inattivo 12+ mesi</div>
+    <div class="legend-item"><span class="pill pill-yellow">YELLOW</span> Inattivo 6+ mesi</div>
+    <div class="legend-item"><span class="pill pill-violet">VIOLA</span> Inattivo 3+ mesi</div>
+    <div class="legend-item"><span class="pill pill-fuchsia">FUCSIA</span> Pagamento non corrispondente alla fattura</div>
+    <div class="legend-item"><span class="pill pill-neutral">Saldo zero esclusi</span></div>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div class="card">
+  <div class="card-title">Carica file Excel mastrini fornitori</div>
+  <div class="drop-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    <div class="dz-icon">📂</div>
+    <div class="dz-title" id="dzTitle">Trascina il file oppure clicca per selezionarlo</div>
+    <div class="dz-sub">.xls · .xlsx — export da gestionale a blocchi per conto</div>
+  </div>
+  <div class="progress-bar" id="progressBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="stats-row" id="statsRow" style="display:none">
+  <div class="stat-card"><div class="stat-label">Conti analizzati</div><div class="stat-value" id="statTotal">0</div></div>
+  <div class="stat-card s-red"><div class="stat-label">🔴 Red — saldo DARE</div><div class="stat-value" id="statRed">0</div></div>
+  <div class="stat-card s-orange"><div class="stat-label">🟠 Orange — 12+ mesi</div><div class="stat-value" id="statOrange">0</div></div>
+  <div class="stat-card s-yellow"><div class="stat-label">🟡 Yellow — 6+ mesi</div><div class="stat-value" id="statYellow">0</div></div>
+  <div class="stat-card s-violet"><div class="stat-label">🟣 Viola — 3+ mesi</div><div class="stat-value" id="statViolet">0</div></div>
+  <div class="stat-card s-fuchsia"><div class="stat-label">🔮 Fucsia — pag. anomali</div><div class="stat-value" id="statFuchsia">0</div></div>
+  <div class="stat-card s-green"><div class="stat-label">✅ Regolari</div><div class="stat-value" id="statOk">0</div></div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls" id="controlsRow" style="display:none">
+  <div class="search-wrap">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input class="search-box" type="text" id="searchBox" placeholder="Cerca fornitore o codice conto…" />
+  </div>
+  <div class="filter-group">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">Tutti</button>
+    <button class="filter-btn f-red" data-filter="red" onclick="setFilter('red')">● Red</button>
+    <button class="filter-btn f-orange" data-filter="orange" onclick="setFilter('orange')">● Orange</button>
+    <button class="filter-btn f-yellow" data-filter="yellow" onclick="setFilter('yellow')">● Yellow</button>
+    <button class="filter-btn f-violet" data-filter="violet" onclick="setFilter('violet')">● Viola</button>
+    <button class="filter-btn f-fuchsia" data-filter="fuchsia" onclick="setFilter('fuchsia')">● Fucsia</button>
+    <button class="filter-btn f-green" data-filter="ok" onclick="setFilter('ok')">● Regolari</button>
+  </div>
+  <button class="btn-export" onclick="exportReport()">↓ Esporta Excel</button>
+</div>
+
+<!-- TABLE -->
+<div id="tableContainer"></div>
+
+</main>
+
+<script>
+let allData=[], filteredData=[];
+let sortCol=null, sortDir=1, currentFilter='all';
+let expandedRows=new Set();
+
+const fmtEur = n => n===null||n===undefined ? '—' :
+  new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(n);
+
+const fmtDate = d => {
+  if(!d) return '—';
+  if(d instanceof Date) return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric'});
+  return d;
+};
+
+function getRefDate() {
+  const v = document.getElementById('dataRif').value.trim();
+  const m = v.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+  return m ? new Date(parseInt(m[3]), parseInt(m[2])-1, parseInt(m[1])) : new Date();
+}
+
+function parseDate(v) {
+  if(!v) return null;
+  if(v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if(typeof v==='number') { const d=new Date(Math.round((v-25569)*86400000)); return isNaN(d.getTime())?null:d; }
+  const s=v.toString().trim();
+  const m=s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})$/);
+  if(m){ let y=parseInt(m[3]); if(y<100)y+=2000; return new Date(y,parseInt(m[2])-1,parseInt(m[1])); }
+  const d=new Date(s); return isNaN(d.getTime())?null:d;
+}
+
+function parseNum(v) {
+  if(v===null||v===undefined||v==='') return 0;
+  if(typeof v==='number') return isNaN(v)?0:v;
+  return parseFloat(v.toString().replace(/\s/g,'').replace(',','.'))||0;
+}
+
+const monthsDiff = (d1,d2) => (d2-d1)/(1000*60*60*24*30.44);
+
+// ─── PARSE FILE ───────────────────────────────────────────
+function parseBlockFile(rows) {
+  const accounts = [];
+  let cur = null;
+  const causFat = document.getElementById('causFat').value.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+  const causPag = document.getElementById('causPag').value.split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+
+  for(const row of rows) {
+    if(!row || row.every(c=>c===null||c===undefined||c==='')) continue;
+    const c2 = (row[2]||'').toString().trim();
+    const c1 = (row[1]||'').toString().trim();
+
+    // Riga totale — salta
+    if(c2==='' && row[9] && row[9].toString().includes('Totale')) continue;
+
+    // Intestazione conto
+    if(c2.startsWith('CONTO')) {
+      if(cur) accounts.push(cur);
+      const m = c2.match(/CONTO\s*:\s*(\S+)\s*-\s*(.+)/);
+      cur = { codice: m?m[1]:c1, nome: m?m[2].trim():c2, movimenti: [], saldoAP: 0 };
+      continue;
+    }
+    if(!cur) continue;
+    if(c2==='Data Reg.'||c2==='Data Reg') continue;
+
+    // Saldo anno precedente
+    if(c1==='SAP' || (row[9]&&row[9].toString().includes('Saldo anno'))) {
+      // Per fornitori: SAP in avere = saldo negativo (normale)
+      cur.saldoAP = parseNum(row[10]) - parseNum(row[11]);
+      continue;
+    }
+
+    const dataReg = row[2] instanceof Date ? row[2] : parseDate(row[2]);
+    if(!dataReg) continue;
+
+    const dare  = parseNum(row[10]);
+    const avere = parseNum(row[11]);
+    if(dare===0 && avere===0) continue;
+
+    const co      = (row[6]||'').toString().trim().toUpperCase();
+    const causale = (row[8]||'').toString().trim();
+    const desc    = (row[9]||'').toString().trim();
+    const ndoc    = (row[3]||'').toString().trim();
+    const dataDoc = row[4] instanceof Date ? row[4] : parseDate(row[4]);
+
+    const tipoFattura  = causFat.some(c=>co===c||co.startsWith(c));
+    const tipoPagamento = causPag.some(c=>co===c||co.startsWith(c)) || causale.toLowerCase().includes('pagat');
+
+    cur.movimenti.push({
+      dataReg, dataDoc, ndoc, co, causale, desc, dare, avere,
+      saldo: parseNum(row[12]),
+      tipo: tipoFattura ? 'fattura' : tipoPagamento ? 'pagamento' : 'altro'
+    });
+  }
+  if(cur) accounts.push(cur);
+  return accounts;
+}
+
+// ─── ANALYZE ─────────────────────────────────────────────
+function analyzeAccounts(accounts) {
+  const refDate = getRefDate();
+  const s3   = parseInt(document.getElementById('soglia3').value);
+  const s6   = parseInt(document.getElementById('soglia6').value);
+  const s12  = parseInt(document.getElementById('soglia12').value);
+  const tol  = parseFloat(document.getElementById('sogliaPct').value)/100;
+  const results = [];
+
+  for(const acc of accounts) {
+    const movs = acc.movimenti;
+
+    // Saldo dall'ultimo movimento (già calcolato dal gestionale)
+    const saldo = movs.length > 0 ? movs[movs.length-1].saldo : 0;
+
+    // Escludi saldo zero
+    if(Math.abs(saldo) < 0.01) continue;
+
+    movs.sort((a,b)=>a.dataReg-b.dataReg);
+    const lastDate  = movs[movs.length-1].dataReg;
+    const firstDate = movs[0].dataReg;
+    const monthsInactive = monthsDiff(lastDate, refDate);
+    const totaleDare  = movs.reduce((s,m)=>s+m.dare,0);
+    const totaleAvere = movs.reduce((s,m)=>s+m.avere,0);
+
+    const flags=[], anomalies=[];
+
+    // ── Saldo DARE (positivo) = anomalia rossa assoluta ──
+    // Per fornitori: saldo negativo = normale (dobbiamo pagare)
+    //                saldo positivo = anomalia (abbiamo pagato troppo)
+    if(saldo > 0.01)
+      flags.push({type:'red', label:`Saldo in DARE: ${fmtEur(saldo)}`});
+
+    // ── Inattività ──
+    if(monthsInactive > s12)
+      flags.push({type:'orange', label:`Inattivo ${Math.round(monthsInactive)} mesi`});
+    else if(monthsInactive > s6)
+      flags.push({type:'yellow', label:`Inattivo ${Math.round(monthsInactive)} mesi`});
+    else if(monthsInactive > s3)
+      flags.push({type:'violet', label:`Inattivo ${Math.round(monthsInactive)} mesi`});
+
+    // ── Anomalie pagamenti per fattura ──
+    // Raggruppa per N.Doc: fatture in AVERE, pagamenti in DARE
+    const byDoc = {};
+    for(const m of movs) {
+      if(!m.ndoc) continue;
+      if(!byDoc[m.ndoc]) byDoc[m.ndoc] = {fatture:[], pagamenti:[]};
+      if(m.tipo==='fattura')   byDoc[m.ndoc].fatture.push(m);
+      if(m.tipo==='pagamento') byDoc[m.ndoc].pagamenti.push(m);
+    }
+
+    for(const [ndoc, d] of Object.entries(byDoc)) {
+      if(!d.fatture.length || !d.pagamenti.length) continue;
+
+      const totFattura   = d.fatture.reduce((s,m)=>s+m.avere, 0);   // fatture in AVERE
+      const totPagato    = d.pagamenti.reduce((s,m)=>s+m.dare, 0);   // pagamenti in DARE
+      if(totFattura < 0.01) continue;
+
+      const ratio = totPagato / totFattura;
+
+      // Pagamento esatto — tutto ok, nessuna anomalia
+      if(Math.abs(ratio - 1) < tol) continue;
+
+      // Pagamento = 1/2 della fattura — atteso, nessuna anomalia
+      if(Math.abs(ratio - 0.5) < tol) continue;
+
+      // Pagamento = 1/3 della fattura — atteso, nessuna anomalia
+      if(Math.abs(ratio - 1/3) < tol) continue;
+
+      // Pagamento = 2/3 della fattura — atteso, nessuna anomalia
+      if(Math.abs(ratio - 2/3) < tol) continue;
+
+      // Qualsiasi altro importo non riconducibile a frazioni standard → fucsia
+      const residuo = totFattura - totPagato;
+      if(totPagato > 0.01 && ratio < 1 - tol) {
+        anomalies.push({type:'fuchsia',
+          text:`Ft. n.${ndoc}: fattura ${fmtEur(totFattura)}, pagato ${fmtEur(totPagato)} (${Math.round(ratio*100)}%) — residuo ${fmtEur(residuo)}`});
+      } else if(ratio > 1 + tol) {
+        anomalies.push({type:'red',
+          text:`Ft. n.${ndoc}: pagato ${fmtEur(totPagato)} su fattura ${fmtEur(totFattura)} — pagamento in ECCESSO di ${fmtEur(totPagato-totFattura)}`});
+      }
+    }
+
+    // Worst flag
+    const order = {red:5, orange:4, yellow:3, violet:2, fuchsia:1, green:0};
+    let worstFlag = 'green';
+    for(const f of flags)
+      if((order[f.type]||0) > (order[worstFlag]||0)) worstFlag = f.type;
+    if(anomalies.length > 0 && worstFlag==='green') worstFlag = 'fuchsia';
+
+    results.push({ ...acc, flags, anomalies, worstFlag,
+      lastDate, firstDate, monthsInactive: Math.round(monthsInactive),
+      saldo, totaleDare, totaleAvere, nMovimenti: movs.length });
+  }
+
+  return results;
+}
+
+// ─── RENDER ───────────────────────────────────────────────
+function renderTable() {
+  const container = document.getElementById('tableContainer');
+  if(!filteredData.length) {
+    container.innerHTML = `<div class="tbl-container"><div class="empty-state">
+      <div class="empty-icon">🔍</div>
+      <div class="empty-title">Nessun risultato</div>
+    </div></div>`;
+    return;
+  }
+
+  const cols = [
+    {key:'codice',         label:'Codice',       w:'90px'},
+    {key:'nome',           label:'Ragione Sociale', w:'22%'},
+    {key:'worstFlag',      label:'Stato',        w:'110px'},
+    {key:'saldo',          label:'Saldo (€)',    w:'120px'},
+    {key:'nMovimenti',     label:'N. Mov.',      w:'70px'},
+    {key:'totaleDare',     label:'Dare tot.',    w:'115px'},
+    {key:'totaleAvere',    label:'Avere tot.',   w:'115px'},
+    {key:'firstDate',      label:'Primo mov.',   w:'100px'},
+    {key:'lastDate',       label:'Ultimo mov.',  w:'100px'},
+    {key:'monthsInactive', label:'Mesi in.',     w:'72px'},
+    {key:'flags',          label:'Flag',         w:'230px'},
+    {key:'anomalies',      label:'Anomalie',     w:'90px'},
+  ];
+
+  const FL = {red:'RED',orange:'ORANGE',yellow:'YELLOW',violet:'VIOLA',fuchsia:'FUCSIA',green:'OK'};
+  const PC = {red:'pill-red',orange:'pill-orange',yellow:'pill-yellow',violet:'pill-violet',fuchsia:'pill-fuchsia',green:'pill-green'};
+
+  let h = `<div class="tbl-container"><div class="tbl-wrap"><table><thead><tr><th style="width:40px"></th>`;
+  for(const co of cols) {
+    const s = sortCol===co.key;
+    h += `<th style="width:${co.w}" onclick="doSort('${co.key}')" class="${s?'sorted':''}">
+      ${co.label}<span class="si">${s?(sortDir>0?'↑':'↓'):'↕'}</span></th>`;
+  }
+  h += `</tr></thead><tbody>`;
+
+  for(const r of filteredData) {
+    const ex  = expandedRows.has(r.codice);
+    const pc  = PC[r.worstFlag]||'pill-neutral';
+    const fh  = r.flags.map(f=>`<span class="pill ${PC[f.type]||'pill-neutral'}">${f.label}</span>`).join(' ');
+    const ah  = r.anomalies.length
+      ? `<span class="pill pill-fuchsia">${r.anomalies.length} anom.</span>`
+      : `<span style="color:#c8c3ba">—</span>`;
+    const miColor = r.monthsInactive>12?'#c05c1a':r.monthsInactive>6?'#9a7c10':r.monthsInactive>3?'#6a3a9a':'#9a9690';
+    // Saldo: positivo = anomalia (rosso), negativo = normale (grigio)
+    const saldoColor = r.saldo > 0.01 ? 'amt-neg' : 'amt-muted';
+
+    h += `<tr>
+      <td><button class="expand-btn" onclick="toggleRow('${r.codice.replace(/'/g,"\\'")}')">
+        ${ex?'▾':'▸'}</button></td>
+      <td style="font-family:monospace;font-size:11px;color:#9a9690">${r.codice}</td>
+      <td style="font-weight:500;white-space:normal;max-width:280px">${r.nome}</td>
+      <td><span class="pill ${pc}">${FL[r.worstFlag]||'?'}</span></td>
+      <td class="${saldoColor}">${fmtEur(r.saldo)}</td>
+      <td style="color:#7a776e">${r.nMovimenti}</td>
+      <td class="amt-muted">${fmtEur(r.totaleDare)}</td>
+      <td class="amt-muted">${fmtEur(r.totaleAvere)}</td>
+      <td style="color:#7a776e;font-size:12px">${fmtDate(r.firstDate)}</td>
+      <td style="color:#7a776e;font-size:12px">${fmtDate(r.lastDate)}</td>
+      <td style="font-weight:600;color:${miColor};font-family:monospace">${r.monthsInactive<999?r.monthsInactive:'—'}</td>
+      <td>${fh||`<span style="color:#c8c3ba">—</span>`}</td>
+      <td>${ah}</td>
+    </tr>`;
+
+    if(ex) {
+      h += `<tr class="detail-row"><td colspan="${cols.length+1}"><div class="detail-inner">
+        <div class="detail-grid">`;
+
+      if(r.flags.length || r.anomalies.length) {
+        h += `<div>
+          <div class="detail-section-title">⚑ Anomalie rilevate</div>
+          <div class="anomaly-list">`;
+        for(const f of r.flags)     h += `<div class="anomaly-item ${f.type}">${f.label}</div>`;
+        for(const a of r.anomalies) h += `<div class="anomaly-item ${a.type}">${a.text}</div>`;
+        h += `</div></div>`;
+      }
+
+      const last12 = [...r.movimenti].sort((a,b)=>b.dataReg-a.dataReg).slice(0,12);
+      if(last12.length) {
+        h += `<div>
+          <div class="detail-section-title">↺ Ultimi movimenti</div>
+          <div class="mini-wrap"><table><thead><tr>
+            <th>Data</th><th>N.Doc</th><th>CO</th><th>Descrizione</th>
+            <th style="text-align:right">Dare</th>
+            <th style="text-align:right">Avere</th>
+            <th style="text-align:right">Saldo</th>
+          </tr></thead><tbody>`;
+        for(const m of last12) {
+          h += `<tr>
+            <td style="color:#7a776e">${fmtDate(m.dataReg)}</td>
+            <td style="font-family:monospace;font-size:11px;color:#9a9690">${m.ndoc||'—'}</td>
+            <td><span class="co-tag">${m.co}</span></td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis">${m.desc||m.causale||'—'}</td>
+            <td style="text-align:right" class="${m.dare>0?'amt-muted':''}">${m.dare>0?fmtEur(m.dare):'—'}</td>
+            <td style="text-align:right" class="${m.avere>0?'amt-muted':''}">${m.avere>0?fmtEur(m.avere):'—'}</td>
+            <td style="text-align:right;font-family:monospace;color:#9a9690">${m.saldo?fmtEur(m.saldo):'—'}</td>
+          </tr>`;
+        }
+        h += `</tbody></table></div></div>`;
+      }
+      h += `</div></div></td></tr>`;
+    }
+  }
+
+  h += `</tbody></table></div>
+    <div class="tbl-footer">${filteredData.length} fornitori visualizzati · conti a saldo zero esclusi</div>
+  </div>`;
+  container.innerHTML = h;
+}
+
+function toggleRow(cod) {
+  if(expandedRows.has(cod)) expandedRows.delete(cod); else expandedRows.add(cod);
+  renderTable();
+}
+
+function doSort(col) {
+  if(sortCol===col) sortDir*=-1; else { sortCol=col; sortDir=1; }
+  const o={red:5,orange:4,yellow:3,violet:2,fuchsia:1,green:0};
+  filteredData.sort((a,b)=>{
+    let va=a[col], vb=b[col];
+    if(col==='worstFlag')  { va=o[va]||0; vb=o[vb]||0; }
+    if(col==='firstDate'||col==='lastDate') { va=va?va.getTime():0; vb=vb?vb.getTime():0; }
+    if(col==='flags')      { va=a.flags.length; vb=b.flags.length; }
+    if(col==='anomalies')  { va=a.anomalies.length; vb=b.anomalies.length; }
+    if(typeof va==='string') return va.localeCompare(vb)*sortDir;
+    return (va-vb)*sortDir;
+  });
+  renderTable();
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.filter===f));
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchBox').value.toLowerCase();
+  filteredData = allData.filter(r=>{
+    if(q && !r.nome.toLowerCase().includes(q) && !r.codice.toLowerCase().includes(q)) return false;
+    if(currentFilter==='red')     return r.flags.some(f=>f.type==='red');
+    if(currentFilter==='orange')  return r.worstFlag==='orange';
+    if(currentFilter==='yellow')  return r.worstFlag==='yellow';
+    if(currentFilter==='violet')  return r.worstFlag==='violet';
+    if(currentFilter==='fuchsia') return r.anomalies.length>0;
+    if(currentFilter==='ok')      return r.worstFlag==='green' && r.anomalies.length===0;
+    return true;
+  });
+  renderTable();
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent   = allData.length;
+  document.getElementById('statRed').textContent     = allData.filter(r=>r.flags.some(f=>f.type==='red')).length;
+  document.getElementById('statOrange').textContent  = allData.filter(r=>r.worstFlag==='orange').length;
+  document.getElementById('statYellow').textContent  = allData.filter(r=>r.worstFlag==='yellow').length;
+  document.getElementById('statViolet').textContent  = allData.filter(r=>r.worstFlag==='violet').length;
+  document.getElementById('statFuchsia').textContent = allData.filter(r=>r.anomalies.length>0).length;
+  document.getElementById('statOk').textContent      = allData.filter(r=>r.worstFlag==='green'&&r.anomalies.length===0).length;
+}
+
+function exportReport() {
+  const rows = allData.map(r=>({
+    'Codice': r.codice,
+    'Ragione Sociale': r.nome,
+    'Stato': r.worstFlag.toUpperCase(),
+    'Saldo (€)': r.saldo.toFixed(2),
+    'N. Movimenti': r.nMovimenti,
+    'Totale Dare (€)': r.totaleDare.toFixed(2),
+    'Totale Avere (€)': r.totaleAvere.toFixed(2),
+    'Primo Movimento': fmtDate(r.firstDate),
+    'Ultimo Movimento': fmtDate(r.lastDate),
+    'Mesi Inattività': r.monthsInactive<999?r.monthsInactive:'',
+    'Flags': r.flags.map(f=>f.label).join('; '),
+    'Anomalie Pagamenti': r.anomalies.map(a=>a.text).join('; '),
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Analisi Fornitori');
+  XLSX.writeFile(wb, `analisi_fornitori_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function processFile(file) {
+  const pb=document.getElementById('progressBar');
+  const pf=document.getElementById('progressFill');
+  pb.style.display='block'; pf.style.width='10%';
+  document.getElementById('dzTitle').textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      pf.style.width='40%';
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true, raw:false});
+      pf.style.width='60%';
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+      pf.style.width='78%';
+      const accounts = parseBlockFile(rows);
+      pf.style.width='90%';
+      allData = analyzeAccounts(accounts);
+      allData.sort((a,b)=>{
+        const o={red:5,orange:4,yellow:3,violet:2,fuchsia:1,green:0};
+        return (o[b.worstFlag]||0)-(o[a.worstFlag]||0);
+      });
+      filteredData = [...allData];
+      pf.style.width='100%';
+      setTimeout(()=>{
+        pb.style.display='none'; pf.style.width='0%';
+        document.getElementById('statsRow').style.display='grid';
+        document.getElementById('controlsRow').style.display='flex';
+        updateStats(); renderTable();
+      },300);
+    } catch(err) {
+      pb.style.display='none';
+      alert('Errore nel file: '+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('fileInput').addEventListener('change', e=>{ if(e.target.files[0]) processFile(e.target.files[0]); });
+const uz = document.getElementById('uploadZone');
+uz.addEventListener('dragover', e=>{ e.preventDefault(); uz.classList.add('over'); });
+uz.addEventListener('dragleave', ()=>uz.classList.remove('over'));
+uz.addEventListener('drop', e=>{ e.preventDefault(); uz.classList.remove('over'); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+document.getElementById('searchBox').addEventListener('input', applyFilters);
+</script>
+</body>
+</html>
